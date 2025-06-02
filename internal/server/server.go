@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"memcached-go/internal/lexer"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
@@ -25,6 +26,14 @@ func Init() {
 }
 
 func Start(port int) {
+	go func() {
+		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		http.ListenAndServe(":8080", nil) // Health check on port 8080
+	}()
+
 	address := fmt.Sprintf(":%d", port)
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
