@@ -30,9 +30,15 @@ func ScanCommand(r *bufio.Scanner, reader io.Reader) (*Command, error) {
 
 	cmdName := strings.ToLower(parts[0])
 	switch cmdName {
-	case "set":
-		if len(parts) < 5 {
-			return nil, errors.New("invalid set command format")
+	case "set", "cas", "add", "replace", "append", "prepend":
+		// <cmd> <key> <flags> <exptime> <bytes> [noreply]
+		// cas <key> <flags> <exptime> <bytes> <cas unique> [noreply]
+		minArgs := 5
+		if cmdName == "cas" {
+			minArgs = 6
+		}
+		if len(parts) < minArgs {
+			return nil, errors.New("invalid " + cmdName + " command format")
 		}
 		cmd := &Command{
 			Name:    parts[0],
@@ -57,7 +63,15 @@ func ScanCommand(r *bufio.Scanner, reader io.Reader) (*Command, error) {
 		}
 		cmd.ByteCount = uint32(byteCount)
 
-		if len(parts) > 5 && parts[5] == "noreply" {
+		argIdx := 5
+		if cmdName == "cas" {
+			if len(parts) < 6 {
+				return nil, errors.New("missing cas unique value")
+			}
+			argIdx = 6
+		}
+
+		if len(parts) > argIdx && parts[argIdx] == "noreply" {
 			cmd.NoReply = true
 		}
 
@@ -80,6 +94,21 @@ func ScanCommand(r *bufio.Scanner, reader io.Reader) (*Command, error) {
 			Name: parts[0],
 			Key:  parts[1],
 		}, nil
+
+	case "delete":
+		// delete <key> [noreply]
+		if len(parts) < 2 {
+			return nil, errors.New("invalid delete command format")
+		}
+		cmd := &Command{
+			Name:    parts[0],
+			Key:     parts[1],
+			NoReply: false,
+		}
+		if len(parts) > 2 && parts[2] == "noreply" {
+			cmd.NoReply = true
+		}
+		return cmd, nil
 
 	default:
 		return nil, errors.New("unsupported command")

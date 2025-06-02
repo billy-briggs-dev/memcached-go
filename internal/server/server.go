@@ -31,7 +31,7 @@ func Start(port int) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
 		})
-		http.ListenAndServe(":8080", nil) // Health check on port 8080
+		http.ListenAndServe(":8080", nil)
 	}()
 
 	address := fmt.Sprintf(":%d", port)
@@ -67,6 +67,91 @@ func handleConnection(conn net.Conn) {
 		}
 
 		switch cmd.Name {
+		case "add":
+			if _, found := cache.Get(cmd.Key); found {
+				if !cmd.NoReply {
+					fmt.Fprintf(conn, "NOT_STORED\r\n")
+				}
+				continue
+			}
+			expiry := time.Duration(cmd.Exptime) * time.Second
+			cache.SetWithTTL(cmd.Key, cacheItem{Data: cmd.Data, Flags: cmd.Flags}, int64(len(cmd.Data)), expiry)
+			cache.Wait()
+			if !cmd.NoReply {
+				fmt.Fprintf(conn, "STORED\r\n")
+			}
+		case "replace":
+			if _, found := cache.Get(cmd.Key); !found {
+				if !cmd.NoReply {
+					fmt.Fprintf(conn, "NOT_STORED\r\n")
+				}
+				continue
+			}
+			expiry := time.Duration(cmd.Exptime) * time.Second
+			cache.SetWithTTL(cmd.Key, cacheItem{Data: cmd.Data, Flags: cmd.Flags}, int64(len(cmd.Data)), expiry)
+			cache.Wait()
+			if !cmd.NoReply {
+				fmt.Fprintf(conn, "STORED\r\n")
+			}
+		case "append", "prepend":
+			value, found := cache.Get(cmd.Key)
+			if !found {
+				if !cmd.NoReply {
+					fmt.Fprintf(conn, "NOT_STORED\r\n")
+				}
+				continue
+			}
+			item, ok := value.(cacheItem)
+			if !ok {
+				fmt.Fprintf(conn, "SERVER_ERROR type assertion failed\r\n")
+				continue
+			}
+			if cmd.Name == "append" {
+				item.Data = append(item.Data, cmd.Data...)
+			} else {
+				item.Data = append(cmd.Data, item.Data...)
+			}
+			item.Flags = cmd.Flags
+			expiry := time.Duration(cmd.Exptime) * time.Second
+			cache.SetWithTTL(cmd.Key, item, int64(len(item.Data)), expiry)
+			cache.Wait()
+			if !cmd.NoReply {
+				fmt.Fprintf(conn, "STORED\r\n")
+			}
+		case "cas":
+			value, found := cache.Get(cmd.Key)
+			if !found {
+				if !cmd.NoReply {
+					fmt.Fprintf(conn, "NOT_FOUND\r\n")
+				}
+				continue
+			}
+			item, ok := value.(cacheItem)
+			if !ok {
+				fmt.Fprintf(conn, "SERVER_ERROR type assertion failed\r\n")
+				continue
+			}
+
+			if cmd.Flags == 0 {
+				cmd.Flags = item.Flags
+			}
+			if cmd.Data == nil {
+				cmd.Data = item.Data
+			}
+
+			if cmd.Exptime == 0 {
+				cmd.Exptime = 30
+			}
+			if cmd.Exptime > 0 {
+				expiry := time.Duration(cmd.Exptime) * time.Second
+				cache.SetWithTTL(cmd.Key, cacheItem{Data: cmd.Data, Flags: cmd.Flags}, int64(len(cmd.Data)), expiry)
+			} else {
+				cache.Set(cmd.Key, cacheItem{Data: cmd.Data, Flags: cmd.Flags}, int64(len(cmd.Data)))
+			}
+			cache.Wait()
+			if !cmd.NoReply {
+				fmt.Fprintf(conn, "STORED\r\n")
+			}
 		case "set":
 			expiry := time.Duration(cmd.Exptime) * time.Second
 			cache.SetWithTTL(cmd.Key, cacheItem{Data: cmd.Data, Flags: cmd.Flags}, int64(len(cmd.Data)), expiry)
@@ -87,6 +172,12 @@ func handleConnection(conn net.Conn) {
 				fmt.Fprintf(conn, "\r\nEND\r\n")
 			} else {
 				fmt.Fprintf(conn, "END\r\n")
+			}
+		case "delete":
+			cache.Del(cmd.Key)
+			cache.Wait()
+			if !cmd.NoReply {
+				fmt.Fprintf(conn, "DELETED\r\n")
 			}
 		default:
 			fmt.Fprintf(conn, "ERROR\r\n")

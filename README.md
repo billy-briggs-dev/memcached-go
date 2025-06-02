@@ -1,15 +1,22 @@
-# My Golang App
+# Memcached Go
 
-My Golang App is a simple application written in Go that demonstrates the structure of a Go project. It includes an entry point and utility functions for type conversions.
+Memcached Go is a lightweight, in-memory key-value store written in Go, inspired by the original Memcached project. It implements the core Memcached protocol, allowing clients to store, retrieve, and delete data efficiently.
+
+### Goal
+
+This project aims to provide a simple, idiomatic Go implementation of the Memcached protocol, suitable for experimentation, learning, and lightweight use cases.
 
 ## Project Structure
 
 ```
-my-golang-app
+memcached-go
 ├── cmd
 │   └── main.go        # Entry point of the application
-├── pkg
-│   └── utils.go       # Utility functions
+├── internal
+│   └── server
+│       └── server.go       # Server commands
+│   └── lexer
+│       └── lexer.go       # Lexigraphically Parse Memcached Commands
 ├── go.mod             # Module definition
 └── go.sum             # Dependency checksums
 ```
@@ -25,7 +32,7 @@ To get started with the application, follow these steps:
 
 2. Navigate to the project directory:
    ```
-   cd my-golang-app
+   cd memcached-go
    ```
 
 3. Install the dependencies:
@@ -37,13 +44,6 @@ To get started with the application, follow these steps:
    ```
    go run cmd/main.go
    ```
-
-## Utilities
-
-The `pkg/utils.go` file contains utility functions such as:
-
-- `StringToInt`: Converts a string to an integer.
-- `IntToString`: Converts an integer to a string.
 
 ## License
 
