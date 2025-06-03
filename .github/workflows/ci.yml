@@ -1,10 +1,10 @@
 name: CI
 
 on:
-  release:
-      types: [ created ]
   push:
       branches: [ main ]
+      tags:
+        - "v*.*.*"
   pull_request:
       branches: [ main ]
 
@@ -29,8 +29,7 @@ jobs:
             run: go test -v ./...
 
           - name: Upload build artifact
-            if: github.event_name == 'release'
-            uses: actions/upload-artifact@v4
+            if: github.ref_type == 'tag'
+            uses: softprops/action-gh-release@v2
             with:
-              name: dist
-              path: dist
+              files: dist/**
